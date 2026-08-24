@@ -202,8 +202,37 @@ class KioskApp:
             self.main_browser_process = None
 
     def reload_main_browser(self):
-        """Starter hovednettleseren på nytt."""
+        """Starter hovednettleseren på nytt, og oppdaterer overlayet hvis det er aktivt."""
         self.start_main_browser()
+        
+        # Hvis et overlay er åpent, må vi også starte selve overlay-webprosessen på nytt
+        if self.current_overlay_url and self.overlay_bar_window:
+            url = self.current_overlay_url
+            
+            if self.overlay_browser_process:
+                try:
+                    self.overlay_browser_process.terminate()
+                    self.overlay_browser_process.wait(timeout=1)
+                except Exception:
+                    try:
+                        self.overlay_browser_process.kill()
+                    except Exception:
+                        pass
+                self.overlay_browser_process = None
+
+            layout = self.display.get_layout_geometry()
+            cmd = [
+                sys.executable, "-m", "pykiosk.webview",
+                url,
+                str(layout["overlay_web_width"]),
+                str(layout["overlay_web_height"]),
+                str(layout["overlay_web_x"]),
+                str(layout["overlay_web_y"])
+            ]
+            
+            env = os.environ.copy()
+            env["WEBKIT_DISABLE_COMPOSITING_MODE"] = "0"
+            self.overlay_browser_process = subprocess.Popen(cmd, env=env)
 
     def rotate_screen(self):
         """Roterer skjermen til neste indeks i rotasjonslisten."""
