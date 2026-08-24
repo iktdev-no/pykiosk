@@ -58,13 +58,13 @@ class KioskApp:
         self.api_server.register_callback("close_overlay", self.close_overlay)
 
     def start_main_browser(self):
-        """Starter hovednettleseren i en egen underprosess via webview_runner."""
+        """Starter hovednettleseren i en egen underprosess via webview."""
         self.stop_main_browser()
         layout = self.display.get_layout_geometry()
         
-        # Bruk overstyrt URL hvis den finnes, ellers hent fra config
         url = self.override_url if self.override_url else self.config.load_url()
 
+        # Bruk sys.executable direkte slik at den matcher det aktive miljøet automatisk
         cmd = [
             sys.executable, "-m", "pykiosk.webview",
             url,
@@ -79,22 +79,14 @@ class KioskApp:
         
         self.main_browser_process = subprocess.Popen(cmd, env=env)
 
-    def stop_main_browser(self):
-        if self.main_browser_process:
-            try:
-                self.main_browser_process.terminate()
-                self.main_browser_process.wait(timeout=2)
-            except Exception:
-                self.main_browser_process.kill()
-            self.main_browser_process = None
-
     def open_overlay(self, url: str):
         """Åpner overlay-nettleseren over hovednettleseren med angitt URL."""
         self.close_overlay()
         
         layout = self.display.get_layout_geometry()
+        
         cmd = [
-            sys.executable, "-m", "pykiosk.webview_runner",
+            sys.executable, "-m", "pykiosk.webview",
             url,
             str(layout["web_width"]),
             str(layout["web_height"]),
@@ -105,6 +97,15 @@ class KioskApp:
         env = os.environ.copy()
         self.overlay_browser_process = subprocess.Popen(cmd, env=env)
         print(f"Overlay åpnet med URL: {url}")
+
+    def stop_main_browser(self):
+        if self.main_browser_process:
+            try:
+                self.main_browser_process.terminate()
+                self.main_browser_process.wait(timeout=2)
+            except Exception:
+                self.main_browser_process.kill()
+            self.main_browser_process = None
 
     def close_overlay(self):
         """Lukker overlay-nettleseren hvis den kjører."""
