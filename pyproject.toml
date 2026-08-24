@@ -14,7 +14,7 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 requires-python = ">=3.8"
-dependencies = ["pywebview", "fastapi", "uvicorn", "PyGObject", "Pillow"]
+dependencies = ["pywebview", "fastapi", "uvicorn", "Pillow"]
 
 [project.scripts]
 pykiosk = "pykiosk.app:main"
