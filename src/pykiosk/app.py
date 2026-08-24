@@ -155,10 +155,15 @@ class KioskApp:
 
     def run(self):
         """Starter hele kioskløsningen."""
-        self.rotation_manager.execute_rotation(self.current_rot_idx)
-        self.start_main_browser()
         self.api_server.start()
         self.root.after(1000, self.monitor_processes)
+
+        # La Tkinter og bunnbaren få tegne seg opp ifred før rotasjon og nettleser starter
+        def delayed_start():
+            self.rotation_manager.execute_rotation(self.current_rot_idx)
+            self.start_main_browser()
+
+        self.root.after(200, delayed_start)
 
         try:
             self.root.mainloop()
