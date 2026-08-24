@@ -3,7 +3,8 @@
 import tkinter as tk
 import base64
 from PIL import ImageTk
-from pykiosk.icons import img_refresh as refreshIcon, img_keyboard as keyboardIcon, img_rotate as rotateIcon
+from pykiosk.icons import get_refresh_icon, get_keyboard_icon, get_rotate_icon
+
 
 
 class BottomBar(tk.Frame):
@@ -17,6 +18,9 @@ class BottomBar(tk.Frame):
         self.on_toggle_keyboard = on_toggle_keyboard
         self.on_rotate = on_rotate
 
+        self.img_refresh = get_refresh_icon()
+        self.img_keyboard = get_keyboard_icon()
+        self.img_rotate = get_rotate_icon()
         # Last inn ikoner
 
         self._create_widgets()
@@ -53,7 +57,7 @@ class BottomBar(tk.Frame):
         # 1. Oppdater-knapp
         btn_refresh = tk.Button(
             btn_container,
-            image=refreshIcon,
+            image=self.img_refresh,
             command=self._handle_refresh,
             **btn_config
         )
@@ -66,7 +70,7 @@ class BottomBar(tk.Frame):
         # 2. Tastatur-knapp
         btn_kb = tk.Button(
             btn_container,
-            image=keyboardIcon,
+            image=self.img_keyboard,
             command=self._handle_toggle_keyboard,
             **btn_config
         )
@@ -78,7 +82,7 @@ class BottomBar(tk.Frame):
         # 3. Roter-knapp
         btn_rotate = tk.Button(
             btn_container,
-            image=rotateIcon,
+            image=self.img_rotate,
             command=self._handle_rotate,
             **btn_config
         )
