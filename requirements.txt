@@ -1,4 +1,5 @@
 pywebview 
 fastapi 
 uvicorn 
-pillow
+PyGObject
+Pillow
