@@ -25,12 +25,9 @@ jobs:
 
       - name: Set dynamic version from Git Tag
         run: |
-          # Henter tag-navnet (f.eks. v1.2.0) og fjerner 'v' slik at det blir 1.2.0
-          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           echo "Setting version to: $TAG_VERSION"
-
-          # Oppdaterer __init__.py automatisk med riktig versjon
-          echo "__version__ = '$TAG_VERSION'" > src/pykiosk/__init__.py
+          printf '__version__ = "%s"\n' "$TAG_VERSION" > src/pykiosk/__init__.py
 
       - name: Install build dependencies
         run: |
