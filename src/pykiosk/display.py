@@ -37,23 +37,40 @@ class DisplayManager:
         
         bar_height = self.config.bar_height
         keyboard_height = self.config.keyboard_height
+        top_bar_height = 40  # Høyden på lukketoppbaren for overlay
 
         web_height = max(1, height - bar_height)
         kb_height = min(keyboard_height, web_height)
 
+        # Beregninger for overlay med toppbar
+        overlay_web_height = max(1, height - bar_height - top_bar_height)
+
         return {
             "width": width,
             "height": height,
+            # Hovednettleser
             "web_x": 0,
             "web_y": 0,
             "web_width": width,
             "web_height": web_height,
+            # Tastatur
             "keyboard_x": 0,
             "keyboard_y": height - bar_height - kb_height,
             "keyboard_width": width,
             "keyboard_height": kb_height,
+            # Bunnbar
             "bar_x": 0,
             "bar_y": height - bar_height,
             "bar_width": width,
             "bar_height": bar_height,
+            # Overlay: Toppbar (for lukkeknapp e.l.)
+            "overlay_top_x": 0,
+            "overlay_top_y": 0,
+            "overlay_top_width": width,
+            "overlay_top_height": top_bar_height,
+            # Overlay: Nettleservindu (skjøvet ned under toppbaren)
+            "overlay_web_x": 0,
+            "overlay_web_y": top_bar_height,
+            "overlay_web_width": width,
+            "overlay_web_height": overlay_web_height,
         }
