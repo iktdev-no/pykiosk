@@ -9,6 +9,11 @@ else
     TARGET_USER="$USER"
 fi
 
+pkill -9 -f Xorg
+pkill -9 -f openbox
+pkill -9 -f python3
+pkill -9 -f webview
+
 VENV_DIR="/home/$TARGET_USER/kiosk-env"
 PROJECT_ROOT="$(pwd)"
 
