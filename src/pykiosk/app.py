@@ -33,6 +33,8 @@ class KioskApp:
         self.main_browser_process = None
         self.overlay_browser_process = None
         self.top_bar = None
+        self.overlay_bar_window = None
+        self.current_overlay_url = None
 
         # 2. Tkinter vindusoppsett (Kiosk-modus)
         self.root.overrideredirect(True)
@@ -58,6 +60,7 @@ class KioskApp:
         self.api_server = KioskApiServer(host="127.0.0.1", port=8081)
         self.api_server.register_callback("open_overlay", self.open_overlay)
         self.api_server.register_callback("close_overlay", self.close_overlay)
+        self.api_server.register_callback("is_overlay_active", self.is_overlay_active)
 
     def start_main_browser(self):
         """Starter hovednettleseren i en egen underprosess via webview."""
@@ -84,17 +87,39 @@ class KioskApp:
         
         self.main_browser_process = subprocess.Popen(cmd, env=env)
 
+    def is_overlay_active(self) -> bool:
+        """Sjekker om overlay-vinduet eller prosessen er aktiv."""
+        has_window = self.overlay_bar_window is not None
+        has_process = self.overlay_browser_process is not None and self.overlay_browser_process.poll() is None
+        return has_window or has_process
+
     def open_overlay(self, url: str):
         self.close_overlay()
+        self.current_overlay_url = url
+        
+        self.root.update_idletasks()
         layout = self.display.get_layout_geometry()
         
+        # Bruk en mikro-forsinkelse via Tkinter slik at X11 garantert har slettet det forrige vinduet
+        self.root.after(50, lambda: self._create_overlay_window(url, layout))
+
+    def _create_overlay_window(self, url: str, layout: dict):
+        if self.current_overlay_url != url:
+            return # Avbryt hvis en annen url ble åpnet i mellomtiden
+
         # 1. Lag et eget Toplevel-vindu for toppbaren
         self.overlay_bar_window = tk.Toplevel(self.root)
         self.overlay_bar_window.overrideredirect(True)
         self.overlay_bar_window.attributes("-topmost", True)
+        
+        try:
+            self.overlay_bar_window.transient(self.root)
+        except Exception:
+            pass
+            
         self.overlay_bar_window.configure(bg="#111111")
         
-        # 2. Sett posisjon og størrelse eksplisitt (Y må være 0 eller overlay_top_y)
+        # 2. Sett posisjon og størrelse eksplisitt
         w = layout["overlay_top_width"]
         h = layout["overlay_top_height"]
         x = layout["overlay_top_x"]
@@ -111,8 +136,9 @@ class KioskApp:
         )
         self.top_bar.pack(fill=tk.BOTH, expand=True)
         
-        # Tving gjennom oppdatert geometri for vindushåndtereren
         self.overlay_bar_window.update_idletasks()
+        self.overlay_bar_window.deiconify()
+        self.overlay_bar_window.lift()
         
         # 4. Start selve webview-overlayet under
         cmd = [
@@ -125,25 +151,45 @@ class KioskApp:
         ]
         
         env = os.environ.copy()
+        env["WEBKIT_DISABLE_COMPOSITING_MODE"] = "0"
         self.overlay_browser_process = subprocess.Popen(cmd, env=env)
 
     def close_overlay(self):
-        # 1. Drep selve Toplevel-vinduet til toppbaren slik at det forsvinner fra skjermen
-        if hasattr(self, 'overlay_bar_window') and self.overlay_bar_window:
+        # 1. Fjern og ødelegg TopBar-innholdet først
+        if self.top_bar:
             try:
+                self.top_bar.destroy()
+            except Exception:
+                pass
+            self.top_bar = None
+
+        # 2. Drep selve Toplevel-vinduet til toppbaren fullstendig
+        if self.overlay_bar_window:
+            try:
+                self.overlay_bar_window.grab_release()
                 self.overlay_bar_window.destroy()
             except Exception:
                 pass
             self.overlay_bar_window = None
-            self.top_bar = None
 
-        # 2. Avslutt nettleserprosessen for overlayet
+        self.current_overlay_url = None
+        
+        # Tving Tkinter til å prosessere alle ventende vindushendelser (sletter restene fra X11)
+        try:
+            self.root.update_idletasks()
+        except Exception:
+            pass
+
+        # 3. Avslutt nettleserprosessen for overlayet
         if self.overlay_browser_process:
             try:
                 self.overlay_browser_process.terminate()
                 self.overlay_browser_process.wait(timeout=2)
             except Exception:
-                self.overlay_browser_process.kill()
+                try:
+                    self.overlay_browser_process.kill()
+                except Exception:
+                    pass
             self.overlay_browser_process = None
    
     def stop_main_browser(self):
@@ -167,6 +213,9 @@ class KioskApp:
         if was_kb_visible:
             self.keyboard.stop()
         
+        was_overlay_active = self.is_overlay_active()
+        active_overlay_url = self.current_overlay_url
+
         self.stop_main_browser()
         self.close_overlay()
 
@@ -174,7 +223,7 @@ class KioskApp:
         
         if success:
             import time
-            time.sleep(0.3)
+            time.sleep(0.4) # Litt lengre pause for å la skjermdriveren rotere ordentlig
             
             layout = self.display.get_layout_geometry()
             self.root.geometry(f'{layout["bar_width"]}x{layout["bar_height"]}+{layout["bar_x"]}+{layout["bar_y"]}')
@@ -182,6 +231,12 @@ class KioskApp:
 
         self.start_main_browser()
         
+        # Gjenopprett overlay med en ørliten forsinkelse så skjermen har stabilisert seg
+        if was_overlay_active and active_overlay_url:
+            import time
+            time.sleep(0.2)
+            self.open_overlay(active_overlay_url)
+
         if was_kb_visible:
             self.keyboard.start()
 

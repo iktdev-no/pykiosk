@@ -8,9 +8,17 @@ class KioskApiServer:
         self.port = port
         self.app = FastAPI()
         self.thread = None
+        self.callbacks = {}
         self._setup_routes()
 
     def _setup_routes(self):
+        @self.app.get("/overlay")
+        async def check_overlay():
+            if "is_overlay_active" in self.callbacks:
+                active = self.callbacks["is_overlay_active"]()
+                return {"active": active}
+            return {"active": False}
+
         @self.app.post("/overlay")
         async def open_overlay(url: str):
             if "open_overlay" in self.callbacks:
@@ -26,8 +34,6 @@ class KioskApiServer:
             return Response(status_code=404)
 
     def register_callback(self, name, func):
-        if not hasattr(self, 'callbacks'):
-            self.callbacks = {}
         self.callbacks[name] = func
 
     def start(self):
@@ -38,5 +44,4 @@ class KioskApiServer:
         self.thread.start()
 
     def stop(self):
-        # FastAPI/Uvicorn håndterer tråden sin pent når programmet dør
         pass
