@@ -2,8 +2,8 @@
 
 import os
 import sys
+import argparse
 import subprocess
-import tkinter as tf  #eller bare tkinter som tk
 import tkinter as tk
 from pykiosk.config import ConfigManager
 from pykiosk.display import DisplayManager
@@ -13,9 +13,13 @@ from pykiosk.api import KioskApiServer
 from pykiosk.BottomBar import BottomBar
 
 class KioskApp:
-    def __init__(self):
+    def __init__(self, initial_url: str|None):
         # 1. Kjernemoduler
         self.config = ConfigManager()
+        
+        # Bruk medsendt URL hvis oppgitt, ellers fall tilbake til lagret konfigurasjon
+        self.override_url = initial_url
+        
         self.root = tk.Tk()
         
         self.display = DisplayManager(self.root, self.config)
@@ -57,10 +61,12 @@ class KioskApp:
         """Starter hovednettleseren i en egen underprosess via webview_runner."""
         self.stop_main_browser()
         layout = self.display.get_layout_geometry()
-        url = self.config.load_url()
+        
+        # Bruk overstyrt URL hvis den finnes, ellers hent fra config
+        url = self.override_url if self.override_url else self.config.load_url()
 
         cmd = [
-            sys.executable, "-m", "pykiosk.webview", # eller banen til webview_runner
+            sys.executable, "-m", "pykiosk.webview",
             url,
             str(layout["web_width"]),
             str(layout["web_height"]),
@@ -119,7 +125,6 @@ class KioskApp:
         """Roterer skjermen til neste indeks i rotasjonslisten."""
         self.current_rot_idx = (self.current_rot_idx + 1) % len(self.config.rotations)
         
-        # Skjul tastatur og nettlesere midlertidig under rotasjon for å unngå grafisk røffhet
         was_kb_visible = self.keyboard.is_visible()
         if was_kb_visible:
             self.keyboard.stop()
@@ -127,16 +132,13 @@ class KioskApp:
         self.stop_main_browser()
         self.close_overlay()
 
-        # Utfør rotasjon og oppdater xinput
         success = self.rotation_manager.execute_rotation(self.current_rot_idx)
         
         if success:
-            # Oppdater Tkinter-geometri for bunnbaren basert på ny skjermrotasjon
             layout = self.display.get_layout_geometry()
             self.root.geometry(f'{layout["bar_width"]}x{layout["bar_height"]}+{layout["bar_x"]}+{layout["bar_y"]}')
             self.root.update_idletasks()
 
-        # Start nettleseren igjen med ny geometri
         self.start_main_browser()
         
         if was_kb_visible:
@@ -152,27 +154,25 @@ class KioskApp:
 
     def run(self):
         """Starter hele kioskløsningen."""
-        # Gjenopprett lagret rotasjon fra start
         self.rotation_manager.execute_rotation(self.current_rot_idx)
-        
-        # Start nettleser og API-server
         self.start_main_browser()
         self.api_server.start()
-
-        # Start watchdog
         self.root.after(1000, self.monitor_processes)
 
         try:
             self.root.mainloop()
         finally:
-            # Rydd opp pent ved avslutning
             self.keyboard.stop()
             self.close_overlay()
             self.stop_main_browser()
             self.api_server.stop()
 
 def main():
-    app = KioskApp()
+    parser = argparse.ArgumentParser(description="PyKiosk App")
+    parser.add_argument("url", nargs="?", default=None, help="Valgfri URL som skal overstyre lagret standard-URL")
+    args = parser.parse_args()
+
+    app = KioskApp(initial_url=args.url)
     app.run()
 
 if __name__ == "__main__":
