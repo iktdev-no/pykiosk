@@ -4,9 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pykiosk"
-dynamic = [
-    "version",
-] # Forteller setuptools at versjonen hentes dynamisk under bygging
+dynamic = ["version"]
 description = "En fleksibel kiosk-løsning med Tkinter, Webview og skrivebordsrotasjon for Linux/X11."
 readme = "README.md"
 authors = [{ name = "Brage Skjønborg" }]
@@ -23,6 +21,7 @@ dependencies = ["pywebview", "fastapi", "uvicorn", "PyGObject", "Pillow"]
 pykiosk = "pykiosk.app:main"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["pykiosk", "pykiosk.*"]
 
 [tool.setuptools.dynamic]
