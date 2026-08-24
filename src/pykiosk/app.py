@@ -60,7 +60,7 @@ class KioskApp:
         url = self.config.load_url()
 
         cmd = [
-            sys.executable, "-m", "pykiosk.webview_runner", # eller banen til webview_runner
+            sys.executable, "-m", "pykiosk.webview", # eller banen til webview_runner
             url,
             str(layout["web_width"]),
             str(layout["web_height"]),
