@@ -2,36 +2,43 @@ name: Publish to PyPI
 
 on:
   release:
-    types: [published]  # Kjører automatisk hver gang du lager en ny Release på GitHub
+    types: [published]
 
 jobs:
   pypi-publish:
     name: Upload release to PyPI
     runs-on: ubuntu-latest
-    
-    # VIKTIG: Disse tillatelsene kreves for Trusted Publishing
+
     permissions:
       id-token: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Viktig for å få med hele historikken/tagger
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.10"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
 
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build
+      - name: Set dynamic version from Git Tag
+        run: |
+          # Henter tag-navnet (f.eks. v1.2.0) og fjerner 'v' slik at det blir 1.2.0
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Setting version to: $TAG_VERSION"
 
-    - name: Build package (Wheel and SDist)
-      run: python -m build
+          # Oppdaterer __init__.py automatisk med riktig versjon
+          echo "__version__ = '$TAG_VERSION'" > src/pykiosk/__init__.py
 
-    - name: Publish package to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build package (Wheel and SDist)
+        run: python -m build
+
+      - name: Publish package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

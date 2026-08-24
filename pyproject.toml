@@ -3,13 +3,13 @@ requires = ["setuptools>=61.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pykiosk"  # Sjekk om "pykiosk" er ledig på PyPI, ellers bruk et unikt navn
-version = "0.1.0"
+name = "pykiosk"
+dynamic = [
+    "version",
+] # Forteller setuptools at versjonen hentes dynamisk under bygging
 description = "En fleksibel kiosk-løsning med Tkinter, Webview og skrivebordsrotasjon for Linux/X11."
 readme = "README.md"
-authors = [
-    { name = "Brage Skjønborg" }
-]
+authors = [{ name = "Brage Skjønborg" }]
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -17,16 +17,13 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 requires-python = ">=3.8"
-dependencies = [
-    "pywebview",
-    "fastapi",
-    "uvicorn",
-    "PyGObject",
-    "Pillow"
-]
+dependencies = ["pywebview", "fastapi", "uvicorn", "PyGObject", "Pillow"]
 
 [project.scripts]
 pykiosk = "pykiosk.app:main"
 
 [tool.setuptools.packages.find]
-include = ["pykiosk*"]
+include = ["pykiosk", "pykiosk.*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pykiosk.__version__" }
