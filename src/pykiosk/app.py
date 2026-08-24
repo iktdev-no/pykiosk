@@ -25,17 +25,14 @@ class KioskApp:
         self.rotation_manager = RotationManager(self.root, self.config, self.display)
         self.keyboard = OnboardKeyboard(self.root)
         
-        # Hent rotasjonsindeks og roter FØR vi lager noen elementer
         self.current_rot_idx = self.config.load_rotation_index()
-        
-        # Utfør rotasjon med en gang slik at X-serveren er i riktig modus
         self.rotation_manager.execute_rotation(self.current_rot_idx)
         import time
-        time.sleep(0.2) # Gi X-serveren et lite øyeblikk til å sette oppløsningen
+        time.sleep(0.2)
         
-        # Prosesser for nettlesere
         self.main_browser_process = None
         self.overlay_browser_process = None
+        self.top_bar = None
 
         # 2. Tkinter vindusoppsett (Kiosk-modus)
         self.root.overrideredirect(True)
@@ -43,10 +40,11 @@ class KioskApp:
         self.root.focus_force()
         self.root.configure(bg="#111111")
 
-        # 3. Opprett Bunnbar (UI) med NØYAKTIG geometri for gjeldende rotasjon
+        # 3. Opprett Hovedvinduets geometri
         layout = self.display.get_layout_geometry()
         self.root.geometry(f'{layout["bar_width"]}x{layout["bar_height"]}+{layout["bar_x"]}+{layout["bar_y"]}')
 
+        # 4. Opprett Bunnbar (UI)
         self.bottom_bar = BottomBar(
             self.root,
             bar_height=self.config.bar_height,
@@ -54,9 +52,9 @@ class KioskApp:
             on_toggle_keyboard=self.keyboard.toggle,
             on_rotate=self.rotate_screen
         )
-        self.bottom_bar.pack(fill=tk.BOTH, expand=True)
+        self.bottom_bar.pack(side=tk.BOTTOM, fill=tk.BOTH)
 
-        # 4. Sett opp API-server
+        # 5. Sett opp API-server
         self.api_server = KioskApiServer(host="127.0.0.1", port=8081)
         self.api_server.register_callback("open_overlay", self.open_overlay)
         self.api_server.register_callback("close_overlay", self.close_overlay)
@@ -65,7 +63,6 @@ class KioskApp:
         """Starter hovednettleseren i en egen underprosess via webview."""
         self.stop_main_browser()
         
-        # Gi X-serveren et øyeblikk til å lande hvis den kalles rett etter rotasjon
         import time
         time.sleep(0.1)
         
@@ -91,25 +88,33 @@ class KioskApp:
         self.close_overlay()
         layout = self.display.get_layout_geometry()
         
-        # 1. Lag et eget lite Tkinter-vindu for toppbaren
+        # 1. Lag et eget Toplevel-vindu for toppbaren
         self.overlay_bar_window = tk.Toplevel(self.root)
         self.overlay_bar_window.overrideredirect(True)
         self.overlay_bar_window.attributes("-topmost", True)
-        self.overlay_bar_window.geometry(
-            f'{layout["overlay_top_width"]}x{layout["overlay_top_height"]}+'
-            f'{layout["overlay_top_x"]}+{layout["overlay_top_y"]}'
-        )
+        self.overlay_bar_window.configure(bg="#111111")
         
-        # Legg til TopBar-komponenten i dette vinduet
+        # 2. Sett posisjon og størrelse eksplisitt (Y må være 0 eller overlay_top_y)
+        w = layout["overlay_top_width"]
+        h = layout["overlay_top_height"]
+        x = layout["overlay_top_x"]
+        y = layout["overlay_top_y"]
+        
+        self.overlay_bar_window.geometry(f"{w}x{h}+{x}+{y}")
+        
+        # 3. Legg TopBar inn i vinduet
         self.top_bar = TopBar(
             self.overlay_bar_window,
-            bar_height=layout["overlay_top_height"],
+            bar_height=h,
             title=url,
             on_close=self.close_overlay
         )
         self.top_bar.pack(fill=tk.BOTH, expand=True)
-
-        # 2. Start selve webview-overlayet skjøvet ned under toppbaren
+        
+        # Tving gjennom oppdatert geometri for vindushåndtereren
+        self.overlay_bar_window.update_idletasks()
+        
+        # 4. Start selve webview-overlayet under
         cmd = [
             sys.executable, "-m", "pykiosk.webview",
             url,
@@ -122,6 +127,25 @@ class KioskApp:
         env = os.environ.copy()
         self.overlay_browser_process = subprocess.Popen(cmd, env=env)
 
+    def close_overlay(self):
+        # 1. Drep selve Toplevel-vinduet til toppbaren slik at det forsvinner fra skjermen
+        if hasattr(self, 'overlay_bar_window') and self.overlay_bar_window:
+            try:
+                self.overlay_bar_window.destroy()
+            except Exception:
+                pass
+            self.overlay_bar_window = None
+            self.top_bar = None
+
+        # 2. Avslutt nettleserprosessen for overlayet
+        if self.overlay_browser_process:
+            try:
+                self.overlay_browser_process.terminate()
+                self.overlay_browser_process.wait(timeout=2)
+            except Exception:
+                self.overlay_browser_process.kill()
+            self.overlay_browser_process = None
+   
     def stop_main_browser(self):
         if self.main_browser_process:
             try:
@@ -130,22 +154,6 @@ class KioskApp:
             except Exception:
                 self.main_browser_process.kill()
             self.main_browser_process = None
-
-    def close_overlay(self):
-        if hasattr(self, 'overlay_bar_window') and self.overlay_bar_window:
-            try:
-                self.overlay_bar_window.destroy()
-            except Exception:
-                pass
-            self.overlay_bar_window = None
-
-        if self.overlay_browser_process:
-            try:
-                self.overlay_browser_process.terminate()
-                self.overlay_browser_process.wait(timeout=2)
-            except Exception:
-                self.overlay_browser_process.kill()
-            self.overlay_browser_process = None
 
     def reload_main_browser(self):
         """Starter hovednettleseren på nytt."""
@@ -162,22 +170,16 @@ class KioskApp:
         self.stop_main_browser()
         self.close_overlay()
 
-        # 1. Utfør selve rotasjonen
         success = self.rotation_manager.execute_rotation(self.current_rot_idx)
         
         if success:
-            # Gi X-serveren et lite øyeblikk til å oppdatere skrivebordsbufferen og oppløsningen
             import time
             time.sleep(0.3)
             
-            # Hent fersk layout *etter* at rotasjonen har satt seg
             layout = self.display.get_layout_geometry()
-            
-            # Tving Tkinter til å oppdatere geometri med de nye sidene (Landscape/Portrait byttet om)
             self.root.geometry(f'{layout["bar_width"]}x{layout["bar_height"]}+{layout["bar_x"]}+{layout["bar_y"]}')
             self.root.update_idletasks()
 
-        # 2. Start nettleseren med de nøyaktig oppdaterte målene
         self.start_main_browser()
         
         if was_kb_visible:
@@ -196,7 +198,6 @@ class KioskApp:
         self.api_server.start()
         self.root.after(1000, self.monitor_processes)
         
-        # Start hovednettleseren direkte ettersom rotasjon og geometri allerede er på plass
         self.start_main_browser()
 
         try:

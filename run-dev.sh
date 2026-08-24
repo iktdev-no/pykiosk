@@ -39,19 +39,36 @@ if ! pgrep -f "Xorg :0" > /dev/null; then
     sleep 1
 fi
 
-echo "[+] Setter opp miljøvariabler og starter pykiosk..."
+echo "[+] Setter opp miljøvariabler..."
 export DISPLAY=:0
 export XAUTHORITY="/home/$TARGET_USER/.Xauthority"
 export PYTHONPATH="$PROJECT_ROOT/src"
 
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+    eval $(dbus-launch --sh-syntax)
+    export DBUS_SESSION_BUS_ADDRESS
+    export DBUS_SESSION_BUS_PID
+fi
+
 # Gi tillatelse lokalt slik at skjermen godtar tegning
 xhost +local:$TARGET_USER 2>/dev/null
 
+# Start Openbox i bakgrunnen slik at vindusreglene blir aktivert
+echo "[+] Starter Openbox vindushåndterer..."
+if [ "$EUID" -eq 0 ]; then
+    su - "$TARGET_USER" -c "export DISPLAY=:0; export XAUTHORITY='/home/$TARGET_USER/.Xauthority'; openbox &"
+else
+    openbox &
+fi
+sleep 1
+
+echo "[+] Starter pykiosk..."
 # Kjør appen direkte med venv sin python, og ta med alle argumenter ($@ slik at URL kan sendes med)
 "$VENV_DIR/bin/python3" -m pykiosk.app "$@"
 
-# Rydd opp Xorg hvis vi startet den i dette skriptet
+# Rydd opp Openbox og Xorg når skriptet avslutter
+echo "[+] Rydder opp prosesser..."
+pkill -x openbox 2>/dev/null
 if [ ! -z "$XORG_PID" ]; then
-    echo "[+] Avslutter Xorg..."
     kill $XORG_PID 2>/dev/null
 fi
