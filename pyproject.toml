@@ -26,4 +26,4 @@ pykiosk = "pykiosk.app:main"
 include = ["pykiosk", "pykiosk.*"]
 
 [tool.setuptools.dynamic]
-version = { attr = "pykiosk.__version__" }
+version = { file = "src/pykiosk/__init__.py" }
