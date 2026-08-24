@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pykiosk"
-dynamic = ["version"]
+version = "0.0.0" # GitHub Action oppdaterer denne automatisk ved release
 description = "En fleksibel kiosk-løsning med Tkinter, Webview og skrivebordsrotasjon for Linux/X11."
 readme = "README.md"
 authors = [{ name = "Brage Skjønborg" }]
@@ -22,6 +22,3 @@ pykiosk = "pykiosk.app:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["pykiosk", "pykiosk.*"]
-
-[tool.setuptools.dynamic]
-version = { file = "src/pykiosk/__init__.py" }

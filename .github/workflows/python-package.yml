@@ -16,18 +16,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Viktig for å få med hele historikken/tagger
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - name: Set dynamic version from Git Tag
+      - name: Set version from Git Tag in pyproject.toml
         run: |
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           echo "Setting version to: $TAG_VERSION"
-          printf '__version__ = "%s"\n' "$TAG_VERSION" > src/pykiosk/__init__.py
+
+          # Skriver versjonen direkte inn i pyproject.toml i roten
+          sed -i "s/^version = \".*\"/version = \"$TAG_VERSION\"/" pyproject.toml
 
       - name: Install build dependencies
         run: |
