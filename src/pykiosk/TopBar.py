@@ -59,4 +59,6 @@ class TopBar(tk.Frame):
 
     def _handle_close(self):
         if self.on_close:
-            self.on_close()
+            # Bruk after(1) slik at knappen rekker å bli ferdig med klikk-hendelsen 
+            # før vinduet og elementene destrueres underveis.
+            self.after(1, self.on_close)

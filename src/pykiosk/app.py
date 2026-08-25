@@ -12,6 +12,7 @@ from pykiosk.rotation import RotationManager
 from pykiosk.keyboard import OnboardKeyboard
 from pykiosk.api import KioskApiServer
 from pykiosk.BottomBar import BottomBar
+import threading
 
 class KioskApp:
     def __init__(self, initial_url: str|None):
@@ -94,13 +95,21 @@ class KioskApp:
         return has_window or has_process
 
     def open_overlay(self, url: str):
-        self.close_overlay()
+        # Sikre at alt som rører Tkinter kjører på hovedtråden
+        if threading.current_thread() != threading.main_thread():
+            self.root.after(0, lambda: self.open_overlay(url))
+            return
+
+        # Sjekk om overlayet allerede er aktivt - hvis det er det, avvis/ignorer nye forsøk!
+        if self.is_overlay_active():
+            print(f"Overlay er allerede aktivt. Ignorerer forsøk på å åpne: {url}")
+            return
+
         self.current_overlay_url = url
         
         self.root.update_idletasks()
         layout = self.display.get_layout_geometry()
         
-        # Bruk en mikro-forsinkelse via Tkinter slik at X11 garantert har slettet det forrige vinduet
         self.root.after(50, lambda: self._create_overlay_window(url, layout))
 
     def _create_overlay_window(self, url: str, layout: dict):
@@ -154,7 +163,14 @@ class KioskApp:
         env["WEBKIT_DISABLE_COMPOSITING_MODE"] = "0"
         self.overlay_browser_process = subprocess.Popen(cmd, env=env)
 
+
+
     def close_overlay(self):
+        # Sikre at alt som rører Tkinter kjører på hovedtråden
+        if threading.current_thread() != threading.main_thread():
+            self.root.after(0, self.close_overlay)
+            return
+
         # 1. Fjern og ødelegg TopBar-innholdet først
         if self.top_bar:
             try:
@@ -174,7 +190,6 @@ class KioskApp:
 
         self.current_overlay_url = None
         
-        # Tving Tkinter til å prosessere alle ventende vindushendelser (sletter restene fra X11)
         try:
             self.root.update_idletasks()
         except Exception:
