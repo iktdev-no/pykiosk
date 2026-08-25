@@ -5,28 +5,27 @@ import base64
 from PIL import ImageTk
 from pykiosk.icons import get_refresh_icon, get_keyboard_icon, get_rotate_icon
 
-
-
 class BottomBar(tk.Frame):
-    def __init__(self, parent, bar_height=50, on_refresh=None, on_toggle_keyboard=None, on_rotate=None, **kwargs):
+    def __init__(self, parent, bar_height=50, on_refresh=None, on_long_refresh=None, on_toggle_keyboard=None, on_rotate=None, **kwargs):
         super().__init__(parent, bg="#000000", bd=0, highlightthickness=0, **kwargs)
         
         self.bar_height = bar_height
         
         # Callbacks for actions
         self.on_refresh = on_refresh
+        self.on_long_refresh = on_long_refresh
         self.on_toggle_keyboard = on_toggle_keyboard
         self.on_rotate = on_rotate
 
         self.img_refresh = get_refresh_icon()
         self.img_keyboard = get_keyboard_icon()
         self.img_rotate = get_rotate_icon()
-        # Last inn ikoner
+
+        self._long_press_timer = None
 
         self._create_widgets()
 
     def _create_widgets(self):
-        # Hovedcontainer for knapper
         btn_container = tk.Frame(
             self,
             bg="#000000",
@@ -54,16 +53,20 @@ class BottomBar(tk.Frame):
             "padx": 10,
         }
 
-        # 1. Oppdater-knapp
-        btn_refresh = tk.Button(
+        # 1. Oppdater-knapp med Long Press-støtte
+        self.btn_refresh = tk.Button(
             btn_container,
             image=self.img_refresh,
-            command=self._handle_refresh,
+            command=self._handle_refresh_click,
             **btn_config
         )
-        btn_refresh.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.btn_refresh.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Bind trykk ned og slipp for å oppdage hold / long press (1 sekund)
+        self.btn_refresh.bind("<Button-1>", self._start_long_press)
+        self.btn_refresh.bind("<ButtonRelease-1>", self._cancel_long_press)
+        self.btn_refresh.bind("<Leave>", self._cancel_long_press)
 
-        # Skillelinje 1
         separator_height = int(self.bar_height * 0.70)
         self._create_separator(btn_container, separator_height)
 
@@ -76,7 +79,6 @@ class BottomBar(tk.Frame):
         )
         btn_kb.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Skillelinje 2
         self._create_separator(btn_container, separator_height)
 
         # 3. Roter-knapp
@@ -104,8 +106,34 @@ class BottomBar(tk.Frame):
             )
         )
 
-    # --- Handlinger ---
-    def _handle_refresh(self):
+    # --- Long Press Logikk for Refresh ---
+    def _start_long_press(self, event):
+        self._clear_timer()
+        # Hvis brukeren holder knappen i 1000ms (1 sekund), utløs long press
+        self._long_press_timer = self.after(1000, self._trigger_long_refresh)
+
+    def _cancel_long_press(self, event=None):
+        self._clear_timer()
+
+    def _clear_timer(self):
+        if self._long_press_timer:
+            try:
+                self.after_cancel(self._long_press_timer)
+            except Exception:
+                pass
+            self._long_press_timer = None
+
+    def _trigger_long_refresh(self):
+        self._long_press_timer = None
+        if self.on_long_refresh:
+            self.on_long_refresh()
+
+    # --- Vanlige Handlinger ---
+    def _handle_refresh_click(self):
+        # Hvis long press allerede har fyrt av, ignorerer vi standard klikk
+        if self._long_press_timer is None:
+            return 
+        self._clear_timer()
         if self.on_refresh:
             self.on_refresh()
 
