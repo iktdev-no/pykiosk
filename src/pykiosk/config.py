@@ -1,7 +1,7 @@
 import os
 
 class ConfigManager:
-    def __init__(self, default_url="http://127.0.0.1:80", rotation_file="/var/lib/kammich/rotation.idx", url_file="/var/lib/kammich/url.cfg"):
+    def __init__(self, default_url="http://127.0.0.1:8080", rotation_file="/var/lib/kammich/rotation.idx", url_file="/var/lib/kammich/url.cfg"):
         self.default_url = default_url
         self.rotation_file = rotation_file
         self.url_file = url_file
