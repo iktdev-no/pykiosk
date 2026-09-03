@@ -19,6 +19,7 @@ class KioskApp:
         # 1. Kjernemoduler
         self.config = ConfigManager()
         self.override_url = initial_url
+        self._display_change_job = None
         
         self.root = tk.Tk()
         
@@ -45,7 +46,8 @@ class KioskApp:
 
         # 3. Opprett Hovedvinduets geometri
         layout = self.display.get_layout_geometry()
-        self.root.geometry(f'{layout["bar_width"]}x{layout["bar_height"]}+{layout["bar_x"]}+{layout["bar_y"]}')
+        if layout is not None:
+            self.root.geometry(f'{layout["bar_width"]}x{layout["bar_height"]}+{layout["bar_x"]}+{layout["bar_y"]}')
 
         # 4. Opprett Bunnbar (UI) med støtte for vanlig trykk og long-press (hard restart)
         self.bottom_bar = BottomBar(
@@ -72,7 +74,10 @@ class KioskApp:
         time.sleep(0.3) # Gi X11 litt ekstra tid til å rydde opp vindusbufferet
         
         layout = self.display.get_layout_geometry()
-        
+        if layout is None:
+            print("No display connected, waiting for display,")
+            return
+
         url = self.override_url if self.override_url else self.config.load_url()
 
         cmd = [
@@ -108,7 +113,10 @@ class KioskApp:
         
         self.root.update_idletasks()
         layout = self.display.get_layout_geometry()
-        
+        if layout is None:
+            print("Can't start overlay when there is no display connected.")
+            return
+
         self.root.after(50, lambda: self._create_overlay_window(url, layout))
 
     def _create_overlay_window(self, url: str, layout: dict):
@@ -305,10 +313,45 @@ class KioskApp:
         
         self.root.after(1000, self.monitor_processes)
 
+    def monitor_display(self):
+        if self.display.has_display_changed():
+            print("Display changed, updating kiosk layout...")
+
+            if self._display_change_job is not None:
+                self.root.after_cancel(self._display_change_job)
+
+            self._display_change_job = self.root.after(
+                750,
+                self.apply_display_layout
+            )
+
+        self.root.after(500, self.monitor_display)
+
+
+    def apply_display_layout(self):
+        self._display_change_job = None
+
+        layout = self.display.get_layout_geometry()
+
+        if layout is None:
+            print("No display connected, stopping browser.")
+            self.stop_main_browser()
+            return
+
+        self.root.geometry(
+            f'{layout["bar_width"]}x{layout["bar_height"]}'
+            f'+{layout["bar_x"]}+{layout["bar_y"]}'
+        )
+
+        self.root.update_idletasks()
+        self.root.update()
+
+        self.reload_main_browser()
+
     def run(self):
         self.api_server.start()
         self.root.after(1000, self.monitor_processes)
-        
+        self.root.after(500, self.monitor_display)
         self.start_main_browser()
 
         try:
